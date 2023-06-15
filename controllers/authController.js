@@ -1,6 +1,7 @@
 const userModel = require("../Models/userModels");
 const { comparePassword, hashPassword } = require("../helper/authHelper");
 const JWT = require("jsonwebtoken");
+const orderModel= require("../Models/orderModel");
 
 
 
@@ -99,7 +100,7 @@ const loginController = async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
-        adddress: user.address,
+        address: user.address,
         role: user.role,
       },
       token,
@@ -165,10 +166,71 @@ const testController = (req, res) => {
   
 };
 
+//orders
+const getOrdersController = async (req, res) => {
+  try {
+    const orders = await orderModel
+      .find({ buyer: req.user._id })
+      .populate("products", "-photo")
+      .populate("buyer", "name");
+    res.json(orders);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      success: false,
+      message: "Error WHile Geting Orders",
+      error,
+    });
+  }
+};
+//all orders
+const getAllOrdersController = async (req, res) => {
+  try {
+    const orders = await orderModel
+      .find({})
+      .populate("products", "-photo")
+      .populate("buyer", "name")
+      .sort({ createdAt: "-1" });
+    res.json(orders);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      success: false,
+      message: "Error WHile Geting Orders",
+      error,
+    });
+  }
+};
+
+//order status
+const orderStatusController = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+    const orders = await orderModel.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true }
+    );
+    res.json(orders);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      success: false,
+      message: "Error While Updateing Order",
+      error,
+    });
+  }
+};
+
 
 module.exports = {
   registerController,
   loginController,
   testController,
-  forgotPasswordController
+  forgotPasswordController,
+  getOrdersController,
+  getAllOrdersController,
+  orderStatusController
+  
 };

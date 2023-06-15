@@ -2,8 +2,18 @@ const  slugify  = require("slugify");
 const ProductModels = require("../Models/ProductModels");
 const fs = require('fs')
 const categoryModel = require("../Models/categoryModel");
+const braintree = require("braintree")
+const orderModel= require("../Models/orderModel");
 
 
+
+// payment gateway
+var gateway = new braintree.BraintreeGateway({
+  environment: braintree.Environment.Sandbox,
+  merchantId: "zs2j6fvq8298nh3c",
+  publicKey: "zy4tmnzzbgzryz27",
+  privateKey: "63ac62a20026dc2780d719b4113a1e76",
+});
 
 const createProductController = async (req, res) => {
   try {
@@ -267,6 +277,80 @@ const productCategoryController = async (req, res) => {
   }
 };
 
+//payment gateway api
+//token
+const braintreeTokenController = async (req, res) => {
+  try {
+    gateway.clientToken.generate({}, function (err, response) {
+      if (err) {
+        res.status(500).send(err);
+      } else {
+        res.send(response);
+      }
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+//payment
+const brainTreePaymentController = async (req, res) => {
+  try {
+    const { nonce, cart } = req.body;
+    let total = 0;
+    cart.map((i) => {
+      total += i.price;
+    });
+    let newTransaction = gateway.transaction.sale(
+      {
+        amount: total,
+        paymentMethodNonce: nonce,
+        options: {
+          submitForSettlement: true,
+        },
+      },
+      function (error, result) {
+        if (result) {
+          const order = new orderModel({
+            products: cart,
+            payment: result,
+            buyer: req.user._id,
+          }).save();
+          res.json({ ok: true });
+        } else {
+          res.status(500).send(error);
+        }
+      }
+    );
+  } catch (error) {
+    console.log(error);
+  }
+};
+// similar products
+ const realtedProductController = async (req, res) => {
+  try {
+    const { pid, cid } = req.params;
+    const products = await ProductModels
+      .find({
+        category: cid,
+        _id: { $ne: pid },
+      })
+      .limit(5)
+      .populate("category");
+    res.status(200).send({
+      success: true,
+      products,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(400).send({
+      success: false,
+      message: "error while geting related product",
+      error,
+    });
+  }
+};
+
 module.exports = {
   createProductController,
   getProductController,
@@ -277,6 +361,9 @@ module.exports = {
   productCountController,
   productFiltersController,
   productListController,
-  productCategoryController
+  productCategoryController,
+  braintreeTokenController,
+  brainTreePaymentController,
+  realtedProductController
 
 }
